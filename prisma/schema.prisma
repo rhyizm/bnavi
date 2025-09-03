@@ -1,0 +1,38 @@
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+model VendorMasterMapping {
+  id                        Int      @id @default(autoincrement())
+  created_at                DateTime @default(now())
+  updated_at                DateTime @updatedAt
+  vendor_name               String?
+  component_name_ocr        String?
+  component_name_corrected  String?
+  master_code_expected      String?
+  master_name_expected      String?
+  master_code               String
+  master_name               String?
+  category                  String @default("部材費")
+  metadata                  Json?
+  @@map("vendor_master_mapping")
+}
+
+model ComponentMaster {
+  id              Int      @id @default(autoincrement())
+  code            String   @unique
+  name            String   // Normalized name for searching
+  originalName    String   @map("original_name") @default("")
+  price           Float?
+  category        String   @default("部材費")
+  updated         DateTime
+
+  @@map("component_master")
+}

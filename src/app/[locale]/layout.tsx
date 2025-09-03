@@ -1,0 +1,64 @@
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import "../globals.css";
+import LanguageSelector from "@/components/i18n/LanguageSelector";
+import { initTranslations } from "@/components/i18n";
+import TranslationsProvider from "@/components/i18n/TranslationsProvider";
+import ThemeProvider from "@/components/theme/ThemeProvider";
+import ThemeToggle from "@/components/theme/ThemeToggle";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: "部材費検索アプリ",
+  description: "Powered by SBI AntWorks Asia",
+  robots: {
+    index: false,
+    follow: true,
+  },
+};
+
+export default async function RootLayout({
+  children,
+  params,
+}: Readonly<{
+  children: React.ReactNode;
+  params: Promise<{ locale: string }>;
+}>) {
+  const { locale } = await params;
+
+  const namespaces = ["common"];
+
+  const { resources } = await initTranslations({
+    locale,
+    namespaces: namespaces,
+  });
+
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
+        <TranslationsProvider locale={locale} namespaces={namespaces} resources={resources}>
+          <ThemeProvider>
+            <header className="fixed w-full flex items-center justify-end px-6 py-4 bg-gray-50 dark:bg-gray-900 hidden">
+              <div className="flex items-center space-x-4">
+                <ThemeToggle />
+                <LanguageSelector />
+              </div>
+            </header>
+            {children}
+          </ThemeProvider>
+        </TranslationsProvider>
+      </body>
+    </html>
+  );
+}

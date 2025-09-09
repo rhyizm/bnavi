@@ -38,14 +38,14 @@ export async function GET(request: NextRequest) {
           SELECT id, code, name, original_name, price, category, extensions.similarity(name, $1) AS score
           FROM "component_master"
           WHERE category = ANY($2::text[])
-          ORDER BY score DESC
+          ORDER BY score DESC, updated DESC NULLS LAST, code ASC NULLS LAST, id ASC
           LIMIT $3
         `, normalizedQuery, categories, limit);
       } else {
         rawResults = await prisma.$queryRaw`
           SELECT id, code, name, original_name, price, category, extensions.similarity(name, ${normalizedQuery}) AS score
           FROM "component_master"
-          ORDER BY score DESC
+          ORDER BY score DESC, updated DESC NULLS LAST, code ASC NULLS LAST, id ASC
           LIMIT ${limit}
         `;
       }

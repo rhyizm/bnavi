@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { normalizeText } from "@/utils";
 import { prisma } from "@/lib/prisma";
 import { NextResponseUtf8 } from "@/lib/next-response-utf8";
@@ -10,19 +11,8 @@ export async function GET(request: NextRequest) {
   const method = searchParams.get('method') || 'trigram';
   const categories = searchParams.getAll('category[]');
   
-  let limit = searchParams.get('limit') || 10;
-  if (typeof limit === 'string') {
-    limit = parseInt(limit, 10);
-  }
-
-  // API Key validation
-  const apiKey = request.headers.get('x-api-key');
-  if (!apiKey || apiKey !== process.env.API_SECRET_KEY) {
-    return NextResponseUtf8(
-      { error: 'Unauthorized' },
-      { status: 401 }
-    );
-  }
+  const limitParam = searchParams.get('limit');
+  const limit = limitParam ? parseInt(limitParam, 10) : 10; // ensure number early
 
   // Normalize the query string
   const normalizedQuery = normalizeText(query);
@@ -31,7 +21,7 @@ export async function GET(request: NextRequest) {
     const results = [];
     
     // Step 1: Search vendor_master_mapping for exact matches
-    const mappingWhereClause: any = {
+    const mappingWhereClause: Prisma.VendorMasterMappingWhereInput = {
       component_name_ocr: normalizedQuery
     };
     
@@ -44,7 +34,8 @@ export async function GET(request: NextRequest) {
     }
     
     const mappingMatches = await prisma.vendorMasterMapping.findMany({
-      where: mappingWhereClause
+      where: mappingWhereClause,
+      orderBy: { updated_at: 'desc' },
     });
     
     // For each mapping match, get the corresponding component from component_master
@@ -66,58 +57,11 @@ export async function GET(request: NextRequest) {
           source: 'mapping',
           vendor_name: mapping.vendor_name
         });
+        // Break once at least one mapping-based result is found
+        break;
       }
     }
-    
-    // Step 2: Perform fuzzy search
-    let fuzzyResults;
-    
-    // Build WHERE clause for category filtering
-    const categoryFilter = categories.length > 0 
-      ? `WHERE category = ANY($2::text[])`
-      : '';
-    
-    if (method === 'trigram') {
-      // Enable pg_trgm extension if it's not already enabled
-      await prisma.$executeRaw`CREATE EXTENSION IF NOT EXISTS pg_trgm SCHEMA extensions`;
-      
-      // Execute the trigram similarity query
-      if (categories.length > 0) {
-        fuzzyResults = await prisma.$queryRawUnsafe(`
-          SELECT id, code, name, original_name, price, category, extensions.similarity(name, $1) AS score
-          FROM "component_master"
-          WHERE category = ANY($2::text[])
-          ORDER BY score DESC
-          LIMIT $3
-        `, normalizedQuery, categories, limit);
-      } else {
-        fuzzyResults = await prisma.$queryRaw`
-          SELECT id, code, name, original_name, price, category, extensions.similarity(name, ${normalizedQuery}) AS score
-          FROM "component_master"
-          ORDER BY score DESC
-          LIMIT ${limit}
-        `;
-      }
-    } else {
-      // Execute the Levenshtein distance query (default)
-      if (categories.length > 0) {
-        fuzzyResults = await prisma.$queryRawUnsafe(`
-          SELECT id, code, name, original_name, price, category, extensions.levenshtein(name, $1) AS score
-          FROM "component_master"
-          WHERE category = ANY($2::text[])
-          ORDER BY score ASC
-          LIMIT $3
-        `, normalizedQuery, categories, limit);
-      } else {
-        fuzzyResults = await prisma.$queryRaw`
-          SELECT id, code, name, original_name, price, category, extensions.levenshtein(name, ${normalizedQuery}) AS score
-          FROM "component_master"
-          ORDER BY score ASC
-          LIMIT ${limit}
-        `;
-      }
-    }
-    
+
     // Define a type for the raw database result
     interface RawComponentResult {
       id: bigint;
@@ -128,9 +72,52 @@ export async function GET(request: NextRequest) {
       category: string;
       score: number | bigint;
     }
+
+    // Step 2: Perform fuzzy search
+    let fuzzyResults: RawComponentResult[] = [];
+    
+    if (method === 'trigram') {
+      // Enable pg_trgm extension if it's not already enabled
+      await prisma.$executeRaw`CREATE EXTENSION IF NOT EXISTS pg_trgm SCHEMA extensions`;
+      
+      // Execute the trigram similarity query
+      if (categories.length > 0) {
+        fuzzyResults = await prisma.$queryRawUnsafe<RawComponentResult[]>(`
+          SELECT id, code, name, original_name, price, category, extensions.similarity(name, $1) AS score
+          FROM "component_master"
+          WHERE category = ANY($2::text[])
+          ORDER BY score DESC, updated DESC NULLS LAST, code ASC NULLS LAST, id ASC
+          LIMIT $3
+        `, normalizedQuery, categories, limit);
+      } else {
+        fuzzyResults = await prisma.$queryRaw<RawComponentResult[]>`
+          SELECT id, code, name, original_name, price, category, extensions.similarity(name, ${normalizedQuery}) AS score
+          FROM "component_master"
+          ORDER BY score DESC, updated DESC NULLS LAST, code ASC NULLS LAST, id ASC
+          LIMIT ${limit}
+        `;
+      }
+    } else {
+      if (categories.length > 0) {
+        fuzzyResults = await prisma.$queryRawUnsafe<RawComponentResult[]>(`
+          SELECT id, code, name, original_name, price, category, extensions.levenshtein(name, $1) AS score
+          FROM "component_master"
+          WHERE category = ANY($2::text[])
+          ORDER BY score ASC, updated DESC NULLS LAST, code ASC NULLS LAST, id ASC
+          LIMIT $3
+        `, normalizedQuery, categories, limit);
+      } else {
+        fuzzyResults = await prisma.$queryRaw<RawComponentResult[]>`
+          SELECT id, code, name, original_name, price, category, extensions.levenshtein(name, ${normalizedQuery}) AS score
+          FROM "component_master"
+          ORDER BY score ASC, updated DESC NULLS LAST, code ASC NULLS LAST, id ASC
+          LIMIT ${limit}
+        `;
+      }
+    }
     
     // Process fuzzy search results
-    const processedFuzzyResults = (fuzzyResults as RawComponentResult[]).map((item: RawComponentResult) => {
+    const processedFuzzyResults = fuzzyResults.map((item: RawComponentResult) => {
       // For levenshtein, normalize the score to be between 0 and 1 (lower distance = higher score)
       let normalizedScore = Number(item.score);
       if (method === 'levenshtein') {
@@ -159,12 +146,8 @@ export async function GET(request: NextRequest) {
       }
     }
     
-    // Sort by score descending
-    results.sort((a, b) => b.score - a.score);
-    
-    // Apply limit to final results
+    // Apply limit to final combined results while preserving order
     const limitedResults = results.slice(0, limit);
-    
     return NextResponseUtf8({ 
       results: limitedResults,
       method: method

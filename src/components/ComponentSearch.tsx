@@ -118,7 +118,7 @@ export default function ComponentSearch() {
       .map((t) => `category[]=${encodeURIComponent(t === 'component' ? '部材費' : '機器費')}`)
       .join('&');
     
-    const url = `/api/components/search?query=${encodeURIComponent(query)}&method=${searchMethod}&limit=${limit}&${categoryParams}`;
+    const url = `/api/search?query=${encodeURIComponent(query)}&method=${searchMethod}&limit=${limit}&${categoryParams}`;
 
     try {
       const res = await fetch(url);

@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
         results.push({
           id: component.id,
           code: component.code,
-          name: component.originalName || component.name,
+          name: component.originalName,
           normalizedName: component.name,
           price: component.price,
           category: component.category,
@@ -128,7 +128,7 @@ export async function GET(request: NextRequest) {
       return {
         id: Number(item.id),
         code: item.code,
-        name: item.original_name || item.name,
+        name: item.original_name,
         normalizedName: item.name,
         price: item.price === null ? null : Number(item.price),
         category: item.category,

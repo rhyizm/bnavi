@@ -13,6 +13,7 @@ interface ComponentResult {
   id: number;
   code: string;
   name: string;
+  normalizedName: string;
   price: number | null;
   category: string;
   score: number;
@@ -288,6 +289,7 @@ export default function ComponentSearch() {
               {[
                 { key: 'code', label: '品名コード', sortable: true },
                 { key: 'name', label: '名前', sortable: true },
+                { key: '', label: '', sortable: false },
                 { key: 'price', label: '価格', sortable: true },
                 { key: 'score', label: '類似度', sortable: true },
                 { key: 'category', label: '種別', sortable: true },
@@ -336,15 +338,6 @@ export default function ComponentSearch() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                     {component.name}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-right">
-                    {component.price === null ? '単価未設定' : `¥${component.price.toLocaleString()}`}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-center">
-                    {component.score.toFixed(3)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {component.category}
-                  </td>
                   <td className="px-1 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     <button
                       onClick={() => handleCopy(component.name)}
@@ -353,6 +346,15 @@ export default function ComponentSearch() {
                     >
                       <Copy size={16} />
                     </button>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-right">
+                    {component.price === null ? '単価未設定' : `¥${component.price.toLocaleString()}`}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 text-center">
+                    {component.score.toFixed(3)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {component.category}
                   </td>
                 </tr>
               ))

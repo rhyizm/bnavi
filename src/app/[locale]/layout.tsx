@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "部材費検索アプリ",
+  title: "部材ナビ",
   description: "Powered by SBI AntWorks Asia",
   robots: {
     index: false,
